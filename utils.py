@@ -1,51 +1,69 @@
-import streamlit as st
 import pandas as pd
-import requests
 import plotly.graph_objects as go
-import datetime
 
-def load_binance_data(symbol, interval, limit):
-    symbol = symbol.replace("/", "")
-    url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"
-    try:
-        response = requests.get(url)
-        data = response.json()
-        df = pd.DataFrame(data, columns=[
-            'timestamp', 'open', 'high', 'low', 'close',
-            'volume', 'close_time', 'quote_asset_volume',
-            'number_of_trades', 'taker_buy_base', 'taker_buy_quote', 'ignore'
-        ])
-        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-        df.set_index('timestamp', inplace=True)
-        df = df.astype(float)
-        return df
-    except Exception as e:
-        st.error(f"Error fetching data: {e}")
+def load_binance_data(pair, interval, lookback):
+    import requests
+    symbol = pair.replace("/", "")
+    url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={lookback}"
+    response = requests.get(url)
+    if response.status_code != 200:
         return None
+
+    data = response.json()
+    df = pd.DataFrame(data, columns=[
+        "timestamp", "open", "high", "low", "close",
+        "volume", "close_time", "quote_asset_volume",
+        "number_of_trades", "taker_buy_base_asset_volume",
+        "taker_buy_quote_asset_volume", "ignore"
+    ])
+    df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+    df.set_index("timestamp", inplace=True)
+    df = df.astype(float)
+    return df[["open", "high", "low", "close", "volume"]]
+
 
 def plot_chart_with_signals(df, signals):
     fig = go.Figure()
 
+    # Świece (candlestick)
     fig.add_trace(go.Candlestick(
         x=df.index,
         open=df['open'],
         high=df['high'],
         low=df['low'],
         close=df['close'],
-        name='Candles'
+        name='Candlesticks'
     ))
 
+    # Sygnały BUY/SELL
     for signal in signals:
         color = 'green' if signal['type'] == 'BUY' else 'red'
         fig.add_trace(go.Scatter(
-            x=[df.index[-1]],
-            y=[signal['price']],
-            mode='markers',
+            x=[signal["time"]],
+            y=[signal["price"]],
+            mode='markers+text',
             marker=dict(color=color, size=12),
-            name=signal['type']
+            text=[signal["type"]],
+            textposition="top center",
+            name=signal["type"]
         ))
-        fig.add_hline(y=signal['sl'], line=dict(color='orange', dash='dash'), name='Stop Loss')
-        fig.add_hline(y=signal['tp'], line=dict(color='blue', dash='dash'), name='Take Profit')
 
-    fig.update_layout(title="Chart with Signals", xaxis_rangeslider_visible=False)
+        # Linie TP i SL
+        fig.add_trace(go.Scatter(
+            x=[signal["time"], signal["time"]],
+            y=[signal["tp"], signal["sl"]],
+            mode='lines',
+            line=dict(color='blue', width=2, dash='dash'),
+            name='TP/SL'
+        ))
+
+    fig.update_layout(
+        title="📈 Wykres z sygnałami i poziomami TP/SL",
+        xaxis_title="Czas",
+        yaxis_title="Cena (USDT)",
+        xaxis_rangeslider_visible=False,
+        height=700
+    )
+
+    import streamlit as st
     st.plotly_chart(fig, use_container_width=True)
