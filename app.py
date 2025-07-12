@@ -1,5 +1,5 @@
 import streamlit as st
-import pandas as pd  # ✅ Import pandas był brakujący!
+import pandas as pd  # Dodane! By działało pd.notna()
 from indicators import analyze_technical_indicators
 from utils import load_binance_data, plot_chart_with_signals
 from telegram_alerts import send_telegram_message
@@ -15,10 +15,14 @@ lookback = st.slider("Number of candles", min_value=100, max_value=1000, value=3
 # Pobranie danych
 data = load_binance_data(pair, interval, lookback)
 
+# Usuwamy rzędy z brakującymi danymi OHLC
+if data is not None:
+    data = data.dropna(subset=["open", "high", "low", "close"])
+
 if data is not None and not data.empty:
     df = analyze_technical_indicators(data)
 
-    # Tworzenie listy sygnałów do wykresu
+    # Tworzymy listę sygnałów do wykresu
     signals = []
     for i, row in df.iterrows():
         if pd.notna(row["signal"]):
@@ -30,8 +34,9 @@ if data is not None and not data.empty:
                 "sl": row["sl"]
             })
 
-    # Pobranie ostatniego sygnału (jeśli istnieje)
-    last_row = df.dropna(subset=["signal"]).iloc[-1] if df['signal'].notna().any() else None
+    # Pobranie ostatniego sygnału z pełnymi danymi
+    filtered_signals = df.dropna(subset=["signal", "close", "sl", "tp"])
+    last_row = filtered_signals.iloc[-1] if not filtered_signals.empty else None
 
     if last_row is not None:
         signal = last_row["signal"]
@@ -58,4 +63,4 @@ if data is not None and not data.empty:
     plot_chart_with_signals(df, signals)
 
 else:
-    st.error("❌ Nie udało się pobrać danych z Binance.")
+    st.error("❌ Nie udało się pobrać danych z Binance lub dane są niekompletne.")
