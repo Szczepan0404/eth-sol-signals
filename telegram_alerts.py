@@ -1,1 +1,1 @@
-# telegram alerts
+# Placeholder for Telegram alerts integration
