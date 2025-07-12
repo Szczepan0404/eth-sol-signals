@@ -4,8 +4,8 @@ import ta
 def analyze_technical_indicators(df):
     signals = []
 
-    df['EMA50'] = ta.trend.ema_indicator(df['close'], window=50).ema_indicator()
-    df['EMA200'] = ta.trend.ema_indicator(df['close'], window=200).ema_indicator()
+    df['EMA50'] = ta.trend.ema_indicator(df['close'], window=50)
+    df['EMA200'] = ta.trend.ema_indicator(df['close'], window=200)
     df['RSI'] = ta.momentum.rsi(df['close'], window=14)
     macd = ta.trend.macd_diff(df['close'])
     df['MACD'] = macd
