@@ -17,6 +17,18 @@ data = load_binance_data(pair, interval, lookback)
 if data is not None and not data.empty:
     df = analyze_technical_indicators(data)
 
+    # Tworzymy listę sygnałów do wykresu
+    signals = []
+    for i, row in df.iterrows():
+        if pd.notna(row["signal"]):
+            signals.append({
+                "time": i,
+                "type": row["signal"].upper(),
+                "price": row["close"],
+                "tp": row["tp"],
+                "sl": row["sl"]
+            })
+
     # Pobranie ostatniego sygnału (jeśli istnieje)
     last_row = df.dropna(subset=["signal"]).iloc[-1] if df['signal'].notna().any() else None
 
@@ -41,8 +53,8 @@ if data is not None and not data.empty:
         """
         send_telegram_message(message.strip())
 
-    # ✅ Wyświetlenie wykresu
-    plot_chart_with_signals(df, df)  # df zawiera sygnały
+    # ✅ Wyświetlenie wykresu z sygnałami
+    plot_chart_with_signals(df, signals)
 
 else:
     st.error("❌ Nie udało się pobrać danych z Binance.")
