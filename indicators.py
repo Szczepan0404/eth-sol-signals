@@ -15,7 +15,7 @@ def analyze_technical_indicators(df):
     df['tp'] = None
     df['sl'] = None
 
-    # Sprawdź warunki i wpisz sygnały + TP i SL
+    # Przeskanuj wszystkie świece
     for i in range(len(df)):
         if (
             df['EMA50'].iloc[i] > df['EMA200'].iloc[i] and
@@ -27,7 +27,7 @@ def analyze_technical_indicators(df):
             atr = df['ATR'].iloc[i]
             df.at[i, 'signal'] = 'buy'
             df.at[i, 'sl'] = entry - 1.5 * atr
-            df.at[i, 'tp'] = entry + 1.5 * (entry - (entry - 1.5 * atr))  # czyli 1.5 * (entry - SL)
+            df.at[i, 'tp'] = entry + 1.5 * (entry - (entry - 1.5 * atr))  # lub: entry + 1.5 * atr
 
         elif (
             df['EMA50'].iloc[i] < df['EMA200'].iloc[i] and
@@ -39,6 +39,6 @@ def analyze_technical_indicators(df):
             atr = df['ATR'].iloc[i]
             df.at[i, 'signal'] = 'sell'
             df.at[i, 'sl'] = entry + 1.5 * atr
-            df.at[i, 'tp'] = entry - 1.5 * ((entry + 1.5 * atr) - entry)  # czyli 1.5 * (SL - entry)
+            df.at[i, 'tp'] = entry - 1.5 * (entry + 1.5 * atr - entry)  # lub: entry - 1.5 * atr
 
     return df
