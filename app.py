@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd  # ✅ Import pandas był brakujący!
 from indicators import analyze_technical_indicators
 from utils import load_binance_data, plot_chart_with_signals
 from telegram_alerts import send_telegram_message
@@ -17,7 +18,7 @@ data = load_binance_data(pair, interval, lookback)
 if data is not None and not data.empty:
     df = analyze_technical_indicators(data)
 
-    # Tworzymy listę sygnałów do wykresu
+    # Tworzenie listy sygnałów do wykresu
     signals = []
     for i, row in df.iterrows():
         if pd.notna(row["signal"]):
