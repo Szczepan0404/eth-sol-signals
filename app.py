@@ -18,6 +18,11 @@ data = load_binance_data(pair, interval, lookback)
 # Analiza i wykres
 if data is not None and not data.empty:
     signals = analyze_technical_indicators(data)
+# Sprawdź typ danych i pobierz ostatni sygnał
+if isinstance(signals, list) and len(signals) > 0:
+    last_signal = signals[-1]
+else:
+    last_signal = None
 
     # Sprawdź ostatni sygnał i wyślij wiadomość na Telegram
     last_signal = signals.iloc[-1]["signal"]
