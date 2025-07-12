@@ -15,7 +15,7 @@ lookback = st.slider("Number of candles", min_value=100, max_value=1000, value=3
 data = load_binance_data(pair, interval, lookback)
 
 if data is not None and not data.empty:
-    df = analyze_technical_indicators(data)
+    df, signals = analyze_technical_indicators(data)  # ⬅️ teraz zwraca też sygnały jako listę słowników
 
     # Pobranie ostatniego sygnału (jeśli istnieje)
     last_row = df.dropna(subset=["signal"]).iloc[-1] if df['signal'].notna().any() else None
@@ -42,7 +42,7 @@ if data is not None and not data.empty:
         send_telegram_message(message.strip())
 
     # ✅ Wyświetlenie wykresu
-    plot_chart_with_signals(df, df)  # podajemy ten sam df, bo zawiera kolumny sygnałów
+    plot_chart_with_signals(df, signals)
 
 else:
     st.error("❌ Nie udało się pobrać danych z Binance.")
