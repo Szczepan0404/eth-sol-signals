@@ -18,19 +18,16 @@ data = load_binance_data(pair, interval, lookback)
 # Analiza i wykres
 if data is not None and not data.empty:
     signals = analyze_technical_indicators(data)
-# Sprawdź typ danych i pobierz ostatni sygnał
-if isinstance(signals, list) and len(signals) > 0:
-    last_signal = signals[-1]
-else:
-    last_signal = None
-
-    # Sprawdź ostatni sygnał i wyślij wiadomość na Telegram
-    last_signal = signals.iloc[-1]["signal"]
-    if last_signal == "buy":
-        send_telegram_message(f"🟢 BUY sygnał dla {pair} na interwale {interval}")
-    elif last_signal == "sell":
-        send_telegram_message(f"🔴 SELL sygnał dla {pair} na interwale {interval}")
-
     plot_chart_with_signals(data, signals)
+
+    # Jeśli signals to lista i nie jest pusta
+    if isinstance(signals, list) and len(signals) > 0:
+        last_signal = signals[-1]
+
+        # Sprawdź ostatni sygnał i wyślij wiadomość na Telegram
+        if last_signal == "buy":
+            send_telegram_message(f"🟢 BUY sygnał dla {pair} na interwale {interval}")
+        elif last_signal == "sell":
+            send_telegram_message(f"🔴 SELL sygnał dla {pair} na interwale {interval}")
 else:
     st.error("Failed to fetch data from Binance.")
