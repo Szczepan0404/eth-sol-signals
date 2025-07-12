@@ -2,34 +2,43 @@ import pandas as pd
 import ta
 
 def analyze_technical_indicators(df):
-    signals = []
-
+    # Wskaźniki techniczne
     df['EMA50'] = ta.trend.ema_indicator(df['close'], window=50)
     df['EMA200'] = ta.trend.ema_indicator(df['close'], window=200)
     df['RSI'] = ta.momentum.rsi(df['close'], window=14)
-    macd = ta.trend.macd_diff(df['close'])
-    df['MACD'] = macd
+    df['MACD'] = ta.trend.macd_diff(df['close'])
     df['ADX'] = ta.trend.adx(df['high'], df['low'], df['close'], window=14)
     df['ATR'] = ta.volatility.average_true_range(df['high'], df['low'], df['close'], window=14)
 
-    if (
-        df['EMA50'].iloc[-1] > df['EMA200'].iloc[-1] and
-        df['RSI'].iloc[-1] < 70 and
-        df['MACD'].iloc[-1] > 0 and
-        df['ADX'].iloc[-1] > 20
-    ):
-        sl = df['close'].iloc[-1] - 1.5 * df['ATR'].iloc[-1]
-        tp = df['close'].iloc[-1] + 1.5 * (df['close'].iloc[-1] - sl)
-        signals.append({'type': 'BUY', 'price': df['close'].iloc[-1], 'sl': sl, 'tp': tp})
+    # Dodaj puste kolumny
+    df['signal'] = None
+    df['tp'] = None
+    df['sl'] = None
 
-    elif (
-        df['EMA50'].iloc[-1] < df['EMA200'].iloc[-1] and
-        df['RSI'].iloc[-1] > 30 and
-        df['MACD'].iloc[-1] < 0 and
-        df['ADX'].iloc[-1] > 20
-    ):
-        sl = df['close'].iloc[-1] + 1.5 * df['ATR'].iloc[-1]
-        tp = df['close'].iloc[-1] - 1.5 * (sl - df['close'].iloc[-1])
-        signals.append({'type': 'SELL', 'price': df['close'].iloc[-1], 'sl': sl, 'tp': tp})
+    # Sprawdź warunki i wpisz sygnały + TP i SL
+    for i in range(len(df)):
+        if (
+            df['EMA50'].iloc[i] > df['EMA200'].iloc[i] and
+            df['RSI'].iloc[i] < 70 and
+            df['MACD'].iloc[i] > 0 and
+            df['ADX'].iloc[i] > 20
+        ):
+            entry = df['close'].iloc[i]
+            atr = df['ATR'].iloc[i]
+            df.at[i, 'signal'] = 'buy'
+            df.at[i, 'sl'] = entry - 1.5 * atr
+            df.at[i, 'tp'] = entry + 1.5 * (entry - (entry - 1.5 * atr))  # czyli 1.5 * (entry - SL)
 
-    return signals
+        elif (
+            df['EMA50'].iloc[i] < df['EMA200'].iloc[i] and
+            df['RSI'].iloc[i] > 30 and
+            df['MACD'].iloc[i] < 0 and
+            df['ADX'].iloc[i] > 20
+        ):
+            entry = df['close'].iloc[i]
+            atr = df['ATR'].iloc[i]
+            df.at[i, 'signal'] = 'sell'
+            df.at[i, 'sl'] = entry + 1.5 * atr
+            df.at[i, 'tp'] = entry - 1.5 * ((entry + 1.5 * atr) - entry)  # czyli 1.5 * (SL - entry)
+
+    return df
