@@ -33,10 +33,11 @@ if data is not None and not data.empty:
     fig.update_layout(title=f'{pair} Candlestick Chart', xaxis_rangeslider_visible=False)
     st.plotly_chart(fig, use_container_width=True)
 
-    # Używamy przedostatniego wiersza — tylko po zamknięciu świecy
-    signal_row = df.iloc[-2] if df['signal'].notna().iloc[-2] else None
+    # ✅ Szukamy ostatniego zamkniętego sygnału (z pominięciem ostatniej świecy)
+    recent_signals = df.iloc[:-1]  # pomijamy ostatnią świecę (jeszcze niezamknięta)
+    if recent_signals['signal'].notna().any():
+        signal_row = recent_signals[recent_signals['signal'].notna()].iloc[-1]
 
-    if signal_row is not None:
         signal = signal_row['signal']
         entry = signal_row['close']
         sl = signal_row['sl']
@@ -61,6 +62,6 @@ if data is not None and not data.empty:
         """
         send_telegram_message(message.strip())
     else:
-        st.info("Brak nowego sygnału w ostatniej zamkniętej świecy.")
+        st.info("Brak nowego sygnału w ostatnich zamkniętych świecach.")
 else:
     st.error("❌ Nie udało się pobrać danych z Binance.")
