@@ -1,12 +1,12 @@
 import streamlit as st
 import pandas as pd
+import pytz
 from indicators import analyze_technical_indicators
 from utils import load_binance_data
 from telegram_alerts import send_telegram_message
 import plotly.graph_objects as go
-import pytz
 
-# Konfiguracja
+# Konfiguracja strony
 st.set_page_config(layout="wide")
 st.title("🔍 ETH/USDT & SOL/USDT Technical Analysis")
 
@@ -21,16 +21,9 @@ data = load_binance_data(pair, interval, lookback)
 if data is not None and not data.empty:
     df = analyze_technical_indicators(data)
 
-    # Upewniamy się, że indeks to DatetimeIndex z czasem UTC
-    if not isinstance(df.index, pd.DatetimeIndex):
-        df.index = pd.to_datetime(df.index)
-
-    if df.index.tz is None:
-        df.index = df.index.tz_localize("UTC")
-
-    # Konwersja na czas Europe/Warsaw
-    warsaw = pytz.timezone("Europe/Warsaw")
-    df.index = df.index.tz_convert(warsaw)
+    # Upewniamy się, że index jest datetime i ustawiamy strefę czasową
+    df.index = pd.to_datetime(df.index)
+    df = df.tz_localize('UTC').tz_convert('Europe/Warsaw')
 
     # Wykres świecowy
     fig = go.Figure(data=[
@@ -46,15 +39,16 @@ if data is not None and not data.empty:
     fig.update_layout(title=f'{pair} Candlestick Chart', xaxis_rangeslider_visible=False)
     st.plotly_chart(fig, use_container_width=True)
 
-    # Ostatni zamknięty sygnał = przedostatnia świeca
+    # Ostatni sygnał – tylko po zamknięciu świecy
     if df['signal'].notna().iloc[-2]:
         signal_row = df.iloc[-2]
+        signal_time = signal_row.name.strftime("%Y-%m-%d %H:%M:%S")
         signal = signal_row['signal']
-        entry = signal_row['close']
-        sl = signal_row['sl']
-        tp = signal_row['tp']
-        signal_time = df.index[-2].strftime("%Y-%m-%d %H:%M:%S")
+        entry = float(signal_row['close'])
+        sl = float(signal_row['sl'])
+        tp = float(signal_row['tp'])
 
+        # Tabelka z parametrami sygnału
         st.markdown("### 📋 Ostatni zamknięty sygnał")
         signal_table = pd.DataFrame({
             "Data i godzina": [signal_time],
@@ -65,10 +59,10 @@ if data is not None and not data.empty:
         })
         st.table(signal_table)
 
-        # Telegram
+        # Powiadomienie Telegram
         message = f"""
 📈 Sygnał **{signal.upper()}** dla {pair} ({interval})  
-🕒 Czas: {signal_time}  
+🕒 Czas (PL): {signal_time}  
 🎯 Cena wejścia: {entry:.2f}  
 ✅ TP: {tp:.2f}  
 ⛔ SL: {sl:.2f}
@@ -84,11 +78,12 @@ if data is not None and not data.empty:
         history_data = {
             "Data i godzina": last_signals.index.strftime("%Y-%m-%d %H:%M:%S"),
             "Sygnał": last_signals["signal"].str.upper(),
-            "Cena wejścia": last_signals["close"].round(2),
-            "Stop Loss": last_signals["sl"].round(2),
-            "Take Profit": last_signals["tp"].round(2),
+            "Cena wejścia": pd.to_numeric(last_signals["close"], errors="coerce").round(2),
+            "Stop Loss": pd.to_numeric(last_signals["sl"], errors="coerce").round(2),
+            "Take Profit": pd.to_numeric(last_signals["tp"], errors="coerce").round(2),
         }
         history_table = pd.DataFrame(history_data)
         st.table(history_table)
+
 else:
     st.error("❌ Nie udało się pobrać danych z Binance.")
