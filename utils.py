@@ -1,29 +1,32 @@
 import pandas as pd
-from binance.client import Client
-import datetime
+import requests
+import time
 
-def load_binance_data(pair: str, interval: str, lookback: int):
-    client = Client()
+def load_binance_data(symbol: str, interval: str, limit: int = 300) -> pd.DataFrame:
+    symbol = symbol.replace("/", "")
+    url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"
 
-    # Zamiana pary np. ETH/USDT → ETHUSDT
-    symbol = pair.replace("/", "")
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
 
-    # Pobranie świec
-    klines = client.get_klines(symbol=symbol, interval=interval, limit=lookback)
-    if not klines:
-        return None
+        df = pd.DataFrame(data, columns=[
+            "timestamp", "open", "high", "low", "close", "volume",
+            "close_time", "quote_asset_volume", "number_of_trades",
+            "taker_buy_base_asset_volume", "taker_buy_quote_asset_volume", "ignore"
+        ])
 
-    df = pd.DataFrame(klines, columns=[
-        "time", "open", "high", "low", "close", "volume",
-        "close_time", "quote_asset_volume", "number_of_trades",
-        "taker_buy_base_volume", "taker_buy_quote_volume", "ignore"
-    ])
+        df = df[["timestamp", "open", "high", "low", "close", "volume"]]
+        df.columns = ["timestamp", "open", "high", "low", "close", "volume"]
 
-    # Konwersja czasu i ustawienie jako indeksu
-    df["time"] = pd.to_datetime(df["time"], unit="ms", utc=True)
-    df.set_index("time", inplace=True)
+        df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+        df.set_index("timestamp", inplace=True)
 
-    # Wybieramy potrzebne kolumny i konwertujemy na float
-    df = df[["open", "high", "low", "close", "volume"]].astype(float)
+        df = df.astype(float)
 
-    return df
+        return df
+
+    except Exception as e:
+        print(f"❌ Błąd podczas pobierania danych z Binance: {e}")
+        return pd.DataFrame()
