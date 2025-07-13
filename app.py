@@ -1,8 +1,9 @@
 import streamlit as st
-import pandas as pd  # Dodane! By działało pd.notna()
+import pandas as pd
 from indicators import analyze_technical_indicators
-from utils import load_binance_data, plot_chart_with_signals
+from utils import load_binance_data
 from telegram_alerts import send_telegram_message
+import plotly.graph_objects as go
 
 st.set_page_config(layout="wide")
 st.title("🔍 ETH/USDT & SOL/USDT Technical Analysis")
@@ -15,52 +16,51 @@ lookback = st.slider("Number of candles", min_value=100, max_value=1000, value=3
 # Pobranie danych
 data = load_binance_data(pair, interval, lookback)
 
-# Usuwamy rzędy z brakującymi danymi OHLC
-if data is not None:
-    data = data.dropna(subset=["open", "high", "low", "close"])
-
 if data is not None and not data.empty:
     df = analyze_technical_indicators(data)
 
-    # Tworzymy listę sygnałów do wykresu
-    signals = []
-    for i, row in df.iterrows():
-        if pd.notna(row["signal"]):
-            signals.append({
-                "time": i,
-                "type": row["signal"].upper(),
-                "price": row["close"],
-                "tp": row["tp"],
-                "sl": row["sl"]
-            })
+    # Wykres świecowy
+    fig = go.Figure(data=[
+        go.Candlestick(
+            x=df.index,
+            open=df['open'],
+            high=df['high'],
+            low=df['low'],
+            close=df['close'],
+            name='Candles'
+        )
+    ])
+    fig.update_layout(title=f'{pair} Candlestick Chart', xaxis_rangeslider_visible=False)
+    st.plotly_chart(fig, use_container_width=True)
 
-    # Pobranie ostatniego sygnału z pełnymi danymi
-    filtered_signals = df.dropna(subset=["signal", "close", "sl", "tp"])
-    last_row = filtered_signals.iloc[-1] if not filtered_signals.empty else None
+    # Używamy przedostatniego wiersza — tylko po zamknięciu świecy
+    signal_row = df.iloc[-2] if df['signal'].notna().iloc[-2] else None
 
-    if last_row is not None:
-        signal = last_row["signal"]
-        price = last_row["close"]
-        sl = last_row["sl"]
-        tp = last_row["tp"]
+    if signal_row is not None:
+        signal = signal_row['signal']
+        entry = signal_row['close']
+        sl = signal_row['sl']
+        tp = signal_row['tp']
 
-        # ✅ Wyświetlenie w aplikacji
-        st.markdown(f"### 📊 Sygnał: **{signal.upper()}**")
-        st.markdown(f"- 🎯 Cena wejścia: **{price:.2f}**")
-        st.markdown(f"- ⛔ Stop Loss: **{sl:.2f}**")
-        st.markdown(f"- ✅ Take Profit: **{tp:.2f}**")
+        # Tabelka z parametrami sygnału
+        st.markdown("### 📋 Ostatni zamknięty sygnał")
+        signal_table = pd.DataFrame({
+            "Sygnał": [signal.upper()],
+            "Cena wejścia": [f"{entry:.2f}"],
+            "Stop Loss": [f"{sl:.2f}"],
+            "Take Profit": [f"{tp:.2f}"]
+        })
+        st.table(signal_table)
 
-        # ✅ Wysyłanie powiadomienia na Telegram
+        # Powiadomienie Telegram
         message = f"""
-📈 Sygnał **{signal.upper()}** dla {pair} ({interval})
-🎯 Cena wejścia: {price:.2f}
-✅ TP: {tp:.2f}
+📈 Sygnał **{signal.upper()}** dla {pair} ({interval})  
+🎯 Cena wejścia: {entry:.2f}  
+✅ TP: {tp:.2f}  
 ⛔ SL: {sl:.2f}
         """
         send_telegram_message(message.strip())
-
-    # ✅ Wyświetlenie wykresu z sygnałami
-    plot_chart_with_signals(df, signals)
-
+    else:
+        st.info("Brak nowego sygnału w ostatniej zamkniętej świecy.")
 else:
-    st.error("❌ Nie udało się pobrać danych z Binance lub dane są niekompletne.")
+    st.error("❌ Nie udało się pobrać danych z Binance.")
