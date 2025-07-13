@@ -6,7 +6,7 @@ from utils import load_binance_data
 from telegram_alerts import send_telegram_message
 import plotly.graph_objects as go
 
-# Konfiguracja strefy czasowej
+# Strefa czasowa PL
 warsaw_tz = pytz.timezone("Europe/Warsaw")
 
 st.set_page_config(layout="wide")
@@ -21,11 +21,14 @@ lookback = st.slider("Number of candles", min_value=100, max_value=1000, value=3
 data = load_binance_data(pair, interval, lookback)
 
 if data is not None and not data.empty:
-    # Konwersja indeksu do datetime (jeśli nie jest) i ustawienie strefy czasowej
+    # Konwersja indeksu na datetime + strefa czasowa
     if not pd.api.types.is_datetime64_any_dtype(data.index):
         data.index = pd.to_datetime(data.index)
 
-    data.index = data.index.tz_localize("UTC").tz_convert(warsaw_tz)
+    if data.index.tz is None:
+        data.index = data.index.tz_localize("UTC")
+
+    data.index = data.index.tz_convert(warsaw_tz)
 
     df = analyze_technical_indicators(data)
 
@@ -43,7 +46,7 @@ if data is not None and not data.empty:
     fig.update_layout(title=f'{pair} Candlestick Chart', xaxis_rangeslider_visible=False)
     st.plotly_chart(fig, use_container_width=True)
 
-    # Pobranie ostatniego zamkniętego sygnału (przedostatni wiersz)
+    # Ostatni zamknięty sygnał
     signal_row = df.iloc[-2] if df['signal'].notna().iloc[-2] else None
 
     if signal_row is not None:
@@ -53,7 +56,7 @@ if data is not None and not data.empty:
         tp = signal_row['tp']
         timestamp = df.index[-2].strftime("%Y-%m-%d %H:%M:%S")
 
-        # Tabela z ostatnim sygnałem
+        # Tabela z sygnałem
         st.markdown("### 📋 Ostatni zamknięty sygnał")
         signal_table = pd.DataFrame({
             "Data/godzina": [timestamp],
@@ -64,7 +67,7 @@ if data is not None and not data.empty:
         })
         st.table(signal_table)
 
-        # Wysyłka do Telegrama
+        # Telegram
         message = f"""
 📈 Sygnał **{signal.upper()}** dla {pair} ({interval})  
 🕒 Czas (PL): {timestamp}  
